@@ -1,19 +1,17 @@
-# Apteryx - Desktop Application Interface
+# Apteryx - Mock App for the Presentation
 
-This directory contains the Streamlit-based desktop application interface for the Apteryx project.
+This is a simple mockup for the application interface using streamlit that was shamelessly vibecoded.
 
 ## Setup and Installation using uv
 
-1.  **Install uv (if you haven't already):**
+1.  **Install uv:**
     *   On macOS and Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
     *   On Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
     *   Or: `pip install uv`
 
 2.  **Create and activate a virtual environment:**
     ```bash
-    # Navigate to the apteryx_ui directory
-    cd path/to/apteryx_ui
-
+    # In the project directory...
     # Create the virtual environment
     uv venv .venv
     ```
@@ -27,14 +25,15 @@ This directory contains the Streamlit-based desktop application interface for th
     ```bash
     uv pip install streamlit numpy pandas plotly
     ```
-    *(Note: `numpy`, `pandas`, and `plotly` are useful for data handling and visualization. You can add more as needed.)*
 
-5.  **Prepare a placeholder image (optional but recommended for camera screen):**
-    Create an `assets` folder in `apteryx_ui` and place a simple PNG image named `placeholder_image.png` inside it. This will be used for the camera preview and captured image display. If you don't have one, the app will show an error for images, or you can modify the code to use `st.empty()` or text placeholders.
-
-6.  **Run the Streamlit application:**
+5.  **Run the Streamlit application:**
     ```bash
     streamlit run app.py
     ```
 
     The application should open in your default web browser.
+
+6.  **Placeholder images:**
+
+      By default, the app will display a `st.empty()` for places, where images should be (taken by camera, camera preview, and so on). If you want to change that, you should create an `assets` folder in the project root directory and place a PNG image named `placeholder_image.png` inside it.
+
