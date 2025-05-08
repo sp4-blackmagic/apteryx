@@ -9,8 +9,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-else:
-    st.warning("Gemini API key not found. Please set GEMINI_API_KEY in your .env file.")
 
 def get_codebase_context():
     # Load all non-sensitive code files for context
@@ -36,6 +34,15 @@ def get_gemini_model():
     return genai.GenerativeModel('gemini-1.5-flash')
 
 def show_chatbot():
+    if not GEMINI_API_KEY:
+        st.markdown("""
+        <div style='border-radius:10px; background:#fff3f3; padding:20px; margin:20px 0; border:1px solid #ffcccc; text-align:center;'>
+            <b>💬 Kiwi Assistant (Chatbot Disabled)</b><br>
+            <span style='color:#d9534f;'>No Gemini API key found.</span><br>
+            <span style='color:#888;'>To enable the chatbot, add your Gemini API key to a <code>.env</code> file as <code>GEMINI_API_KEY=your-key-here</code> and restart the app.</span>
+        </div>
+        """, unsafe_allow_html=True)
+        return
     st.markdown("""
     <style>
     .chat-container {

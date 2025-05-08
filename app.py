@@ -7,7 +7,7 @@ from modules.about import show_about_page
 from modules.datacube import show_datacube_page
 from modules.comparison import show_comparison_page
 from modules.kiwi_benefits import show_kiwi_benefits_page
-from modules.components import show_help_page, show_feedback_page
+from modules.components import show_help_page, show_feedback_page, show_settings_page
 from modules.chatbot import show_chatbot
 import yaml
 
@@ -55,7 +55,8 @@ main_screen_options = {
 # ===============
 utility_screen_options = {
     "Help": "❓ Help & Documentation",
-    "Feedback": "📧 Feedback"
+    "Feedback": "📧 Feedback",
+    "Settings": "⚙️ Settings"
 }
 
 # Create buttons for main screens
@@ -130,6 +131,8 @@ elif active_screen_to_display == "Help":
     show_help_page()
 elif active_screen_to_display == "Feedback":
     show_feedback_page()
+elif active_screen_to_display == "Settings":
+    show_settings_page()
 
 def show_help_page():
     st.header("❓ Help & Documentation")

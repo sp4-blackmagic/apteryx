@@ -1,39 +1,53 @@
 # Apteryx - Mock App for the Presentation
 
-This is a simple mockup for the application interface using streamlit that was shamelessly vibecoded.
+This is a simple mockup for the application interface using Streamlit.
 
-## Setup and Installation using uv
+## Quick Start
 
-1.  **Install uv:**
-    *   On macOS and Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-    *   On Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
-    *   Or: `pip install uv`
+1. **Clone the repository and enter the project directory.**
 
-2.  **Create and activate a virtual environment:**
-    ```bash
-    # In the project directory...
-    # Create the virtual environment
-    uv venv .venv
+2. **Run the setup script:**
+
+   ```bash
+   bash setup.sh
+   ```
+
+   This script will:
+   - Create and activate a virtual environment (if not already present)
+   - Install all required dependencies (using `uv` if available)
+   - Launch the Streamlit application automatically
+
+3. **Access the app:**
+
+   The application should open in your default web browser. If not, visit the URL shown in your terminal (usually http://localhost:8501).
+
+---
+
+### Notes
+
+- **Sample Data:**
+
+  The repository includes sample data in the `data/` directory for demonstration and testing purposes. You can use these files to explore the app's features without needing to capture new data immediately.
+
+- **Placeholder images:**
+
+  By default, the app will display a `st.empty()` for places where images should be (taken by camera, camera preview, etc.). If you want to change that, create an `assets` folder in the project root directory and place a PNG image named `placeholder_image.png` inside it.
+
+- **Requirements:**
+
+  The `setup.sh` script will check for Python 3.8+, `uv`, and other dependencies. If something is missing, it will attempt to install it or prompt you with instructions.
+
+- **Gemini API Key (for Chatbot, Optional):**
+
+  If you want to use the built-in chatbot, you need a Gemini API key from Google. You can either:
+  - Enter it when prompted by the setup script, **or**
+  - Create a `.env` file in the project root with the following content:
+    
+    ```env
+    GEMINI_API_KEY=your-gemini-api-key-here
     ```
+  If you skip this step, the app will still work, but the chatbot will not be available.
 
-3.  **Activate the virtual environment:**
-    *   Windows (PowerShell): `.venv\Scripts\Activate.ps1`
-    *   Windows (Cmd.exe): `.venv\Scripts\activate.bat`
-    *   Linux/macOS: `source .venv/bin/activate`
+---
 
-4.  **Install dependencies:**
-    ```bash
-    uv pip install streamlit numpy pandas plotly
-    ```
-
-5.  **Run the Streamlit application:**
-    ```bash
-    streamlit run app.py
-    ```
-
-    The application should open in your default web browser.
-
-6.  **Placeholder images:**
-
-      By default, the app will display a `st.empty()` for places, where images should be (taken by camera, camera preview, and so on). If you want to change that, you should create an `assets` folder in the project root directory and place a PNG image named `placeholder_image.png` inside it.
-
+For more details, see the comments in `

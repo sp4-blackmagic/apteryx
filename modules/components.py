@@ -1,4 +1,7 @@
 import streamlit as st
+from pathlib import Path
+import os
+from dotenv import set_key
 
 def show_help_page():
     st.header("❓ Help & Documentation")
@@ -54,4 +57,18 @@ def show_feedback_page():
                 st.success("Thank you for your feedback! (Simulated submission)")
                 print(f"Feedback Received:\nType: {feedback_type}\nEmail: {feedback_email}\nMessage: {feedback_text}")
             else:
-                st.error("Please enter your feedback before submitting.") 
+                st.error("Please enter your feedback before submitting.")
+
+def show_settings_page():
+    st.header("⚙️ Settings")
+    st.markdown("---")
+    st.subheader("Gemini API Key (for Chatbot)")
+    st.write("Enter your Gemini API key below to enable the chatbot. This will be saved to your .env file.")
+    # Read current key if available
+    current_key = os.getenv("GEMINI_API_KEY", "")
+    new_key = st.text_input("Gemini API Key", value=current_key, type="password", placeholder="Enter Gemini API Key...")
+    if st.button("Save API Key", key="save_gemini_key"):
+        env_path = Path(".env")
+        # Always overwrite .env with only the GEMINI_API_KEY line
+        env_path.write_text(f"GEMINI_API_KEY={new_key}\n")
+        st.success("Gemini API key saved! Please refresh or restart the app to enable the chatbot.") 
