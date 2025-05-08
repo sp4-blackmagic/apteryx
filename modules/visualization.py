@@ -29,6 +29,7 @@ def show_visualization_page():
         # Remove background using Otsu for each band
         cube_fg = np.zeros_like(cube)
         mask_all = np.ones(cube.shape[:2], dtype=bool)
+        mask_sum = 0
         for b in range(cube.shape[2]):
             band_img = cube[:, :, b]
             try:
@@ -36,8 +37,10 @@ def show_visualization_page():
                 mask = band_img > thresh
                 cube_fg[:, :, b] = band_img * mask
                 mask_all &= mask
+                mask_sum += np.sum(mask)
             except Exception:
                 cube_fg[:, :, b] = band_img
+                mask_sum += np.sum(np.ones_like(band_img, dtype=bool))
         # Average spectrum (before/after)
         avg_spectrum_raw = np.mean(cube.reshape(-1, cube.shape[2]), axis=0)
         avg_spectrum_fg = np.mean(cube_fg.reshape(-1, cube.shape[2]), axis=0)
@@ -48,12 +51,22 @@ def show_visualization_page():
             except Exception:
                 wavelengths = None
         x = wavelengths if wavelengths is not None and len(wavelengths) == len(avg_spectrum_raw) else np.arange(len(avg_spectrum_raw))
-        st.markdown("**Average Spectrum (Before/After Background Removal)**")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x, y=avg_spectrum_raw, mode='lines', name='Raw (with background)', line=dict(color='lightblue')))
-        fig.add_trace(go.Scatter(x=x, y=avg_spectrum_fg, mode='lines', name='Foreground Only (Otsu)', line=dict(color='orange', width=3)))
-        fig.update_layout(title="Average Spectrum Comparison", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="Reflectance")
-        st.plotly_chart(fig, use_container_width=True)
+        # Check if Otsu mask is all True or nearly all True
+        total_pixels = cube.shape[0] * cube.shape[1] * cube.shape[2]
+        if mask_sum / total_pixels > 0.98:
+            st.markdown("**Average Spectrum (Foreground Only, Otsu did not remove background)**")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x, y=avg_spectrum_fg, mode='lines', name='Foreground Only (Otsu)', line=dict(color='orange', width=3)))
+            fig.update_layout(title="Average Spectrum (Foreground Only)", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="Reflectance")
+            st.plotly_chart(fig, use_container_width=True)
+            st.info("Otsu thresholding did not remove any significant background. Only the foreground spectrum is shown.")
+        else:
+            st.markdown("**Average Spectrum (Before/After Background Removal)**")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x, y=avg_spectrum_raw, mode='lines', name='Raw (with background)', line=dict(color='lightblue')))
+            fig.add_trace(go.Scatter(x=x, y=avg_spectrum_fg, mode='lines', name='Foreground Only (Otsu)', line=dict(color='orange', width=3)))
+            fig.update_layout(title="Average Spectrum Comparison", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="Reflectance")
+            st.plotly_chart(fig, use_container_width=True)
         st.latex(r"\bar{S}_{fg}(\lambda) = \frac{1}{N_{fg}} \sum_{i \in fg} S_i(\lambda)")
         # All further features use only foreground
         avg_spectrum = avg_spectrum_fg
