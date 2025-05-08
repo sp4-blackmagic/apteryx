@@ -1,11 +1,11 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from scipy.fft import fft
 from skimage.filters import threshold_otsu
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objs as go
 
 def generate_dummy_spectrum_data():
     """Generates dummy spectral data for plotting."""
@@ -49,15 +49,11 @@ def show_visualization_page():
                 wavelengths = None
         x = wavelengths if wavelengths is not None and len(wavelengths) == len(avg_spectrum_raw) else np.arange(len(avg_spectrum_raw))
         st.markdown("**Average Spectrum (Before/After Background Removal)**")
-        fig, ax = plt.subplots()
-        ax.plot(x, avg_spectrum_raw, label="Raw (with background)", alpha=0.5)
-        ax.plot(x, avg_spectrum_fg, label="Foreground Only (Otsu)", linewidth=2)
-        ax.set_title("Average Spectrum Comparison")
-        ax.set_xlabel("Wavelength (nm)" if wavelengths is not None else "Band Index")
-        ax.set_ylabel("Reflectance")
-        ax.legend()
-        ax.grid(True)
-        st.pyplot(fig)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=avg_spectrum_raw, mode='lines', name='Raw (with background)', line=dict(color='lightblue')))
+        fig.add_trace(go.Scatter(x=x, y=avg_spectrum_fg, mode='lines', name='Foreground Only (Otsu)', line=dict(color='orange', width=3)))
+        fig.update_layout(title="Average Spectrum Comparison", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="Reflectance")
+        st.plotly_chart(fig, use_container_width=True)
         st.latex(r"\bar{S}_{fg}(\lambda) = \frac{1}{N_{fg}} \sum_{i \in fg} S_i(\lambda)")
         # All further features use only foreground
         avg_spectrum = avg_spectrum_fg
@@ -65,46 +61,34 @@ def show_visualization_page():
         deriv2 = savgol_filter(avg_spectrum, 7, 2, deriv=2)
         cr = avg_spectrum - np.min(avg_spectrum)
         fft_mag = np.abs(fft(avg_spectrum))
-        # --- Explanations ---
+        # --- Explanations and Interactive Plots ---
         st.markdown("**1st Derivative**: The rate of change of the spectrum, highlighting edges and transitions.")
         st.latex(r"S'(\lambda) = \frac{d\bar{S}_{fg}}{d\lambda}")
-        fig, ax = plt.subplots()
-        ax.plot(x, deriv1)
-        ax.set_title("1st Derivative (Foreground Only)")
-        ax.set_xlabel("Wavelength (nm)" if wavelengths is not None else "Band Index")
-        ax.set_ylabel("d(Reflectance)/d\lambda")
-        ax.grid(True)
-        st.pyplot(fig)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=deriv1, mode='lines', name="1st Derivative", line=dict(color='green')))
+        fig.update_layout(title="1st Derivative (Foreground Only)", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="d(Reflectance)/d\lambda")
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("**2nd Derivative**: The curvature of the spectrum, useful for detecting peaks and valleys.")
         st.latex(r"S''(\lambda) = \frac{d^2\bar{S}_{fg}}{d\lambda^2}")
-        fig, ax = plt.subplots()
-        ax.plot(x, deriv2)
-        ax.set_title("2nd Derivative (Foreground Only)")
-        ax.set_xlabel("Wavelength (nm)" if wavelengths is not None else "Band Index")
-        ax.set_ylabel("d^2(Reflectance)/d\lambda^2")
-        ax.grid(True)
-        st.pyplot(fig)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=deriv2, mode='lines', name="2nd Derivative", line=dict(color='purple')))
+        fig.update_layout(title="2nd Derivative (Foreground Only)", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="d^2(Reflectance)/d\lambda^2")
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("**Continuum Removed**: The spectrum with its minimum value subtracted, emphasizing relative features.")
         st.latex(r"CR(\lambda) = \bar{S}_{fg}(\lambda) - \min(\bar{S}_{fg})")
-        fig, ax = plt.subplots()
-        ax.plot(x, cr)
-        ax.set_title("Continuum Removed (Foreground Only)")
-        ax.set_xlabel("Wavelength (nm)" if wavelengths is not None else "Band Index")
-        ax.set_ylabel("Intensity")
-        ax.grid(True)
-        st.pyplot(fig)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=cr, mode='lines', name="Continuum Removed", line=dict(color='red')))
+        fig.update_layout(title="Continuum Removed (Foreground Only)", xaxis_title="Wavelength (nm)" if wavelengths is not None else "Band Index", yaxis_title="Intensity")
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("**FFT Magnitudes**: The magnitude of the Fast Fourier Transform of the average spectrum, showing frequency components.")
         st.latex(r"|FFT(\bar{S}_{fg}(\lambda))|")
-        fig, ax = plt.subplots()
-        ax.plot(np.arange(len(fft_mag)), fft_mag)
-        ax.set_title("FFT Magnitudes (Foreground Only)")
-        ax.set_xlabel("Frequency Index")
-        ax.set_ylabel("Magnitude")
-        ax.grid(True)
-        st.pyplot(fig)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=np.arange(len(fft_mag)), y=fft_mag, mode='lines', name="FFT Magnitudes", line=dict(color='blue')))
+        fig.update_layout(title="FFT Magnitudes (Foreground Only)", xaxis_title="Frequency Index", yaxis_title="Magnitude")
+        st.plotly_chart(fig, use_container_width=True)
         st.info("Data visualization generated for the last captured kiwi (background removed with Otsu).")
         return
 
