@@ -6,6 +6,7 @@ from modules.inference import show_inference_page
 from modules.about import show_about_page
 from modules.datacube import show_datacube_page
 from modules.comparison import show_comparison_page
+from modules.kiwi_benefits import show_kiwi_benefits_page
 from modules.components import show_help_page, show_feedback_page
 import yaml
 
@@ -22,7 +23,6 @@ st.set_page_config(
 # Sidebar
 # =======
 st.sidebar.title("Apteryx 🥝")
-st.sidebar.markdown("---")
 
 # Initialize active_screen in session state if it doesn't exist
 if 'active_screen' not in st.session_state:
@@ -45,6 +45,7 @@ main_screen_options = {
     "Datacube": "🗂️ Datacube Viewer",
     "Comparison": "🔬 Cube Comparison",
     "Inference Engine": "🧠 Inference Engine",
+    "Kiwi Benefits": "🥝 Why Eat More Kiwi?",
     "About": "👥 About Us"
 }
 
@@ -69,24 +70,6 @@ for screen_key, screen_name in utility_screen_options.items():
     if st.sidebar.button(screen_name, key=f"btn_{screen_key}", use_container_width=True):
         st.session_state.active_screen = screen_key
 
-# Add theme toggle at the bottom of the sidebar
-with st.sidebar:
-    st.markdown("---")
-    import streamlit.components.v1 as components
-    theme_icon = "🌙" if st.session_state.get('theme', 'light') == 'light' else "☀️"
-    theme_label = "Dark Mode" if st.session_state.get('theme', 'light') == 'light' else "Light Mode"
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        if st.button(theme_icon, key="theme_toggle_btn"):
-            st.session_state['theme'] = 'dark' if st.session_state.get('theme', 'light') == 'light' else 'light'
-    # Custom CSS for centering and hiding label if sidebar is collapsed
-    st.markdown("""
-    <style>
-    [data-testid="stSidebar"] .block-container { display: flex; flex-direction: column; height: 100vh; }
-    [data-testid="stSidebar"] .block-container > div:last-child { margin-top: auto; }
-    </style>
-    """, unsafe_allow_html=True)
-
 # --- Screen Implementations ---
 active_screen_to_display = st.session_state.active_screen
 
@@ -98,6 +81,8 @@ elif active_screen_to_display == "Datacube":
     show_datacube_page()
 elif active_screen_to_display == "Comparison":
     show_comparison_page()
+elif active_screen_to_display == "Kiwi Benefits":
+    show_kiwi_benefits_page()
 elif active_screen_to_display == "Inference Engine":
     show_inference_page()
 elif active_screen_to_display == "About":
