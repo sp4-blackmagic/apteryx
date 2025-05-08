@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import time
 import os
+from utils import get_random_kiwi_image, load_spectral_data, spectral_to_rgb, get_average_rgb
 
 # --- Page Configuration ---
 
@@ -107,41 +108,34 @@ def screen_camera_control():
         else:
             preview_area.markdown("<div style='height:300px; background-color:#f0f0f0; display:flex; align-items:center; justify-content:center; border:1px solid #ccc; margin-bottom: 1rem;'>Camera Preview Area</div>", unsafe_allow_html=True)
 
-
         if st.button("📸 Take Picture", key="take_picture_btn", type="primary"):
-            st.session_state.picture_taken = True
-            st.success("Picture captured! (Simulated)")
+            try:
+                # Get random kiwi image
+                kiwi_file = get_random_kiwi_image()
+                # Load spectral data
+                spectral_data = load_spectral_data(kiwi_file)
+                # Convert to RGB
+                rgb_image = spectral_to_rgb(spectral_data.load())
+                # Get average RGB
+                avg_rgb = get_average_rgb(rgb_image)
+                
+                st.session_state.picture_taken = True
+                st.session_state.current_image = rgb_image
+                st.session_state.avg_rgb = avg_rgb
+                st.success("Picture captured from showcase!")
+            except Exception as e:
+                st.error(f"Error capturing image: {str(e)}")
 
         if 'picture_taken' in st.session_state and st.session_state.picture_taken:
             st.subheader("Captured Image")
-            if placeholder_image_exists:
-                st.image(PLACEHOLDER_IMG_PATH, caption="Captured Hyperspectral Image (Placeholder)", use_column_width=True)
-            else:
-                st.markdown("<div style='height:300px; background-color:#e0e0e0; display:flex; align-items:center; justify-content:center; border:1px solid #aaa; margin-bottom: 1rem'>Captured Image Area</div>", unsafe_allow_html=True)
-
-            dummy_hdr_content = "ENVI\ndescription = {Hyperspectral Image Header}\n"
-            dummy_hdr_content += f"samples = {st.session_state.get('cam_width', 640)}\n"
-            dummy_hdr_content += f"lines   = {st.session_state.get('cam_height', 480)}\n"
-            dummy_hdr_content += "bands   = 200\ndata type = 12\ninterleave = bil\nsensor type = Unknown\nbyte order = 0\n"
-            dummy_hdr_content += "wavelength = {400.000000, 402.500000, ..., 900.000000}"
-
-            dummy_raw_content = np.random.bytes(st.session_state.get('cam_width', 640) * st.session_state.get('cam_height', 480) * 200 * 2)
-
-            col_dl1, col_dl2 = st.columns(2)
-            with col_dl1:
-                st.download_button(
-                    label="⬇️ Download .hdr",
-                    data=dummy_hdr_content.encode('utf-8'),
-                    file_name="captured_image.hdr",
-                    mime="text/plain"
-                )
-            with col_dl2:
-                st.download_button(
-                    label="⬇️ Download .raw",
-                    data=dummy_raw_content,
-                    file_name="captured_image.raw",
-                    mime="application/octet-stream"
-                )
+            if 'current_image' in st.session_state:
+                st.image(st.session_state.current_image, caption="Captured Hyperspectral Image", use_column_width=True)
+                
+                if 'avg_rgb' in st.session_state:
+                    rgb = st.session_state.avg_rgb
+                    st.markdown(f"**Average RGB Values:** R: {rgb[0]}, G: {rgb[1]}, B: {rgb[2]}")
+                    # Display color swatch
+                    st.markdown(f'<div style="width:100px; height:100px; background-color:rgb({rgb[0]},{rgb[1]},{rgb[2]}); border:1px solid #ccc;"></div>', unsafe_allow_html=True)
 
     with col_settings:
         st.subheader("⚙️ Camera Configuration")
