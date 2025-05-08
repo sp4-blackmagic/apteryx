@@ -1,6 +1,8 @@
 import streamlit as st
 import os
+import numpy as np
 from utils import get_random_kiwi_image, load_spectral_data, spectral_to_rgb, get_average_rgb
+from PIL import Image
 
 def show_camera_page():
     st.header("📷 Camera Control")
@@ -8,43 +10,7 @@ def show_camera_page():
 
     col_main, col_settings = st.columns([2, 1])
 
-    with col_main:
-        st.subheader("Camera Preview")
-        preview_area = st.empty()
-        if os.path.exists("assets/placeholder_image.png"):
-            preview_area.image("assets/placeholder_image.png", caption="Live Camera Feed (Placeholder)", use_column_width=True)
-        else:
-            preview_area.markdown("<div style='height:300px; background-color:#f0f0f0; display:flex; align-items:center; justify-content:center; border:1px solid #ccc; margin-bottom: 1rem;'>Camera Preview Area</div>", unsafe_allow_html=True)
-
-        if st.button("📸 Take Picture", key="take_picture_btn", type="primary"):
-            try:
-                # Get random kiwi image
-                kiwi_file = get_random_kiwi_image()
-                # Load spectral data
-                spectral_data = load_spectral_data(kiwi_file)
-                # Convert to RGB
-                rgb_image = spectral_to_rgb(spectral_data.load())
-                # Get average RGB
-                avg_rgb = get_average_rgb(rgb_image)
-                
-                st.session_state.picture_taken = True
-                st.session_state.current_image = rgb_image
-                st.session_state.avg_rgb = avg_rgb
-                st.success("Picture captured from showcase!")
-            except Exception as e:
-                st.error(f"Error capturing image: {str(e)}")
-
-        if 'picture_taken' in st.session_state and st.session_state.picture_taken:
-            st.subheader("Captured Image")
-            if 'current_image' in st.session_state:
-                st.image(st.session_state.current_image, caption="Captured Hyperspectral Image", use_column_width=True)
-                
-                if 'avg_rgb' in st.session_state:
-                    rgb = st.session_state.avg_rgb
-                    st.markdown(f"**Average RGB Values:** R: {rgb[0]}, G: {rgb[1]}, B: {rgb[2]}")
-                    # Display color swatch
-                    st.markdown(f'<div style="width:100px; height:100px; background-color:rgb({rgb[0]},{rgb[1]},{rgb[2]}); border:1px solid #ccc;"></div>', unsafe_allow_html=True)
-
+    # --- Camera Settings ---
     with col_settings:
         st.subheader("⚙️ Camera Configuration")
         st.session_state.integration_time = st.number_input(
@@ -81,6 +47,70 @@ def show_camera_page():
 
         if st.button("Apply Settings"):
             st.success("Camera settings applied (Simulated)")
+
+    # --- Camera Preview & Capture ---
+    with col_main:
+        st.subheader("Camera Preview")
+        preview_area = st.empty()
+        # Only load a kiwi if not already loaded for this session
+        if 'preview_kiwi_cube' not in st.session_state or st.session_state.get('preview_kiwi_cube') is None:
+            try:
+                kiwi_file = get_random_kiwi_image()
+                spectral_data = load_spectral_data(kiwi_file)
+                cube = spectral_data.load()
+                st.session_state.preview_kiwi_cube = cube
+                st.session_state.preview_kiwi_metadata = getattr(spectral_data, 'metadata', None)
+            except Exception as e:
+                preview_area.error(f"Could not load preview: {e}")
+                st.session_state.preview_kiwi_cube = None
+                st.session_state.preview_kiwi_metadata = None
+        cube = st.session_state.get('preview_kiwi_cube')
+        metadata = st.session_state.get('preview_kiwi_metadata')
+        if cube is not None:
+            # Use the first band for grayscale preview
+            if len(cube.shape) == 3:
+                band_img = cube[:, :, 0]
+            elif len(cube.shape) == 2:
+                band_img = cube
+            else:
+                preview_area.error("Unsupported datacube shape for preview.")
+                band_img = None
+            if band_img is not None:
+                band_img = np.squeeze(band_img)
+                if band_img.ndim == 2:
+                    band_img_norm = ((band_img - band_img.min()) * (255.0 / (band_img.max() - band_img.min()))).astype(np.uint8)
+                    img = Image.fromarray(band_img_norm, mode='L')
+                    img = img.resize((int(st.session_state.cam_width), int(st.session_state.cam_height)), Image.BILINEAR)
+                    preview_area.image(img, caption="Live Camera Feed (Grayscale Kiwi, Band 0)", use_container_width=True)
+        else:
+            preview_area.error("No preview available.")
+
+        if st.button("📸 Take Picture", key="take_picture_btn", type="primary"):
+            if cube is not None:
+                # Use the current previewed kiwi for capture
+                spectral_data = cube
+                st.session_state.picture_taken = True
+                st.session_state.captured_cube = spectral_data
+                st.session_state.captured_metadata = metadata
+                # Also update the datacube viewer
+                st.session_state.last_preview_cube = spectral_data
+                st.session_state.last_preview_metadata = metadata
+                # Show RGB image after capture
+                rgb_image = spectral_to_rgb(spectral_data)
+                st.session_state.current_image = rgb_image
+                st.success("Picture captured from preview!")
+            else:
+                st.error("No preview datacube to capture.")
+
+        # --- Show RGB image after capture ---
+        if st.session_state.get('picture_taken') and st.session_state.get('current_image') is not None:
+            st.markdown("---")
+            st.subheader("Captured RGB Image")
+            st.image(st.session_state.current_image, caption="Captured Hyperspectral Image (RGB Approximation)", use_container_width=True)
+            avg_rgb = get_average_rgb(st.session_state.current_image)
+            if avg_rgb is not None:
+                st.markdown(f"**Average RGB Values:** R: {avg_rgb[0]}, G: {avg_rgb[1]}, B: {avg_rgb[2]}")
+                st.markdown(f'<div style="width:100px; height:100px; background-color:rgb({avg_rgb[0]},{avg_rgb[1]},{avg_rgb[2]}); border:1px solid #ccc;"></div>', unsafe_allow_html=True)
 
 def estimate_file_sizes(width, height, integration_time):
     """Estimates RAM usage and file size. Very rough estimation."""
