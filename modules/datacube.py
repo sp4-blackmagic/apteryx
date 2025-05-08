@@ -10,7 +10,12 @@ from skimage.filters import threshold_otsu
 def show_datacube_page():
     st.header("🗂️ Datacube Viewer")
     st.markdown("---")
-    st.subheader("3D Cube Explorer")
+    st.subheader("3D Cube Explorer (Fancy Animation)")
+    st.markdown("""
+    The 3D Cube Explorer below visualizes the hyperspectral datacube of the captured kiwi. 
+    **Background pixels are automatically removed using Otsu's thresholding** on each band, so only the fruit is shown in the 3D volume. 
+    You can rotate, zoom, and explore the cube interactively.
+    """)
 
     # Use the last preview datacube if available, else fallback to a random kiwi
     cube = st.session_state.get('last_preview_cube', None)
@@ -32,9 +37,20 @@ def show_datacube_page():
         except Exception:
             wavelengths = None
 
+    # Remove background using Otsu thresholding for each band
+    cube_fg = np.zeros_like(cube)
+    for b in range(bands):
+        band_img = cube[:, :, b]
+        try:
+            thresh = threshold_otsu(band_img)
+            mask = band_img > thresh
+            cube_fg[:, :, b] = band_img * mask
+        except Exception:
+            cube_fg[:, :, b] = band_img  # fallback: no mask
+
     # Downsample for performance if needed
     max_dim = 64
-    ds_cube = cube
+    ds_cube = cube_fg
     if max(ds_cube.shape) > max_dim:
         factors = [max(1, s // max_dim) for s in ds_cube.shape]
         ds_cube = ds_cube[::factors[0], ::factors[1], ::factors[2]]

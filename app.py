@@ -5,6 +5,8 @@ from modules.visualization import show_visualization_page
 from modules.inference import show_inference_page
 from modules.about import show_about_page
 from modules.datacube import show_datacube_page
+from modules.components import show_help_page, show_feedback_page
+import yaml
 
 # --- Page Configuration ---
 
@@ -24,6 +26,14 @@ st.sidebar.markdown("---")
 # Initialize active_screen in session state if it doesn't exist
 if 'active_screen' not in st.session_state:
     st.session_state.active_screen = "Camera Control" # Default screen
+
+# Load default config
+if 'default_config' not in st.session_state:
+    try:
+        with open('default_config.yaml', 'r') as f:
+            st.session_state.default_config = yaml.safe_load(f)
+    except Exception:
+        st.session_state.default_config = {}
 
 # ============
 # Main Screens
@@ -56,6 +66,24 @@ st.sidebar.subheader("Support")
 for screen_key, screen_name in utility_screen_options.items():
     if st.sidebar.button(screen_name, key=f"btn_{screen_key}", use_container_width=True):
         st.session_state.active_screen = screen_key
+
+# Add theme toggle at the bottom of the sidebar
+with st.sidebar:
+    st.markdown("---")
+    import streamlit.components.v1 as components
+    theme_icon = "🌙" if st.session_state.get('theme', 'light') == 'light' else "☀️"
+    theme_label = "Dark Mode" if st.session_state.get('theme', 'light') == 'light' else "Light Mode"
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        if st.button(theme_icon, key="theme_toggle_btn"):
+            st.session_state['theme'] = 'dark' if st.session_state.get('theme', 'light') == 'light' else 'light'
+    # Custom CSS for centering and hiding label if sidebar is collapsed
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] .block-container { display: flex; flex-direction: column; height: 100vh; }
+    [data-testid="stSidebar"] .block-container > div:last-child { margin-top: auto; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- Screen Implementations ---
 active_screen_to_display = st.session_state.active_screen
