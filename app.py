@@ -66,6 +66,44 @@ for screen_key, screen_name in main_screen_options.items():
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Support")
+
+# Camera status logic
+camera_ready = st.session_state.get('current_image') is not None
+camera_preview = st.session_state.get('preview_kiwi_cube') is not None
+if camera_ready:
+    cam_color = '#28d94c'  # green
+    cam_text = 'Camera Ready'
+elif camera_preview:
+    cam_color = '#ffd600'  # yellow
+    cam_text = 'Camera Initialized (No Image)'
+else:
+    cam_color = '#ff4b4b'  # red
+    cam_text = 'Camera Not Ready'
+# Pulsing dot CSS
+st.sidebar.markdown(f'''
+<style>
+.pulse-dot {{
+  height: 16px;
+  width: 16px;
+  background-color: {cam_color};
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 0 rgba(40, 217, 76, 0.7);
+  animation: pulse 1.2s infinite;
+}}
+@keyframes pulse {{
+  0% {{ box-shadow: 0 0 0 0 {cam_color}; }}
+  70% {{ box-shadow: 0 0 0 10px rgba(40, 217, 76, 0); }}
+  100% {{ box-shadow: 0 0 0 0 {cam_color}; }}
+}}
+</style>
+<div style='display: flex; align-items: center; justify-content: center; margin-bottom: 10px;'>
+  <span class="pulse-dot"></span>
+  <span style='font-weight: 500; color: #333; text-align: center;'>{cam_text}</span>
+</div>
+''', unsafe_allow_html=True)
+
 # Create buttons for utility screens
 for screen_key, screen_name in utility_screen_options.items():
     if st.sidebar.button(screen_name, key=f"btn_{screen_key}", use_container_width=True):
