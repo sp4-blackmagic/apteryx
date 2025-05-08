@@ -10,25 +10,16 @@ from skimage.filters import threshold_otsu
 def show_datacube_page():
     st.header("🗂️ Datacube Viewer")
     st.markdown("---")
-    st.subheader("3D Cube Explorer (Fancy Animation)")
-    st.markdown("""
-    The 3D Cube Explorer below visualizes the hyperspectral datacube of the captured kiwi. 
-    **Background pixels are automatically removed using Otsu's thresholding** on each band, so only the fruit is shown in the 3D volume. 
-    You can rotate, zoom, and explore the cube interactively.
-    """)
-
-    # Use the last preview datacube if available, else fallback to a random kiwi
+    # Band selection and background removal first
+    st.subheader("Band Selection & Background Removal")
     cube = st.session_state.get('last_preview_cube', None)
     metadata = st.session_state.get('last_preview_metadata', None)
-
     if cube is None:
         st.info("No datacube available. Please visit the Camera Control page first.")
         return
-
     if len(cube.shape) != 3:
         st.error("Loaded data is not a 3D datacube.")
         return
-
     h, w, bands = cube.shape
     wavelengths = None
     if metadata and 'wavelength' in metadata:
@@ -36,66 +27,21 @@ def show_datacube_page():
             wavelengths = [float(w) for w in metadata['wavelength']]
         except Exception:
             wavelengths = None
-
-    # Remove background using Otsu thresholding for each band
-    cube_fg = np.zeros_like(cube)
-    for b in range(bands):
-        band_img = cube[:, :, b]
-        try:
-            thresh = threshold_otsu(band_img)
-            mask = band_img > thresh
-            cube_fg[:, :, b] = band_img * mask
-        except Exception:
-            cube_fg[:, :, b] = band_img  # fallback: no mask
-
-    # Downsample for performance if needed
-    max_dim = 64
-    ds_cube = cube_fg
-    if max(ds_cube.shape) > max_dim:
-        factors = [max(1, s // max_dim) for s in ds_cube.shape]
-        ds_cube = ds_cube[::factors[0], ::factors[1], ::factors[2]]
-    # 3D Cube
-    fig3d = go.Figure(data=go.Volume(
-        x=np.repeat(np.arange(ds_cube.shape[1]), ds_cube.shape[0]*ds_cube.shape[2]),
-        y=np.tile(np.repeat(np.arange(ds_cube.shape[0]), ds_cube.shape[2]), ds_cube.shape[1]),
-        z=np.tile(np.arange(ds_cube.shape[2]), ds_cube.shape[0]*ds_cube.shape[1]),
-        value=ds_cube.transpose(1,0,2).flatten(),
-        opacity=0.1,
-        surface_count=10,
-        colorscale='Viridis',
-    ))
-    fig3d.update_layout(
-        width=500, height=500,
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Band',
-            aspectmode='cube',
-        ),
-        margin=dict(l=0, r=0, b=0, t=0)
-    )
-    st.plotly_chart(fig3d, use_container_width=True)
-
-    st.markdown("---")
-    st.subheader("Band Selection & Background Removal")
     band = st.slider("Select Band for Analysis", 0, bands-1, 0)
     band_img = np.squeeze(cube[:, :, band])
     if band_img.ndim != 2:
         st.error("Selected band is not 2D.")
         return
-
     # Background removal options
     st.markdown("**Background Removal**")
-    method = st.radio("Choose background removal method:", ["Otsu (auto)", "Manual threshold"])
-    if method == "Otsu (auto)":
-        threshold = threshold_otsu(band_img)
-        st.caption(f"Otsu threshold: {threshold:.2f}")
-        user_threshold = threshold
-    else:
-        min_val, max_val = float(np.min(band_img)), float(np.max(band_img))
-        user_threshold = st.slider("Manual threshold", min_val, max_val, float(np.percentile(band_img, 10)), step=0.01)
-    mask = band_img > user_threshold
-
+    show_raw = st.checkbox("Raw (no background removal)", value=True)
+    show_manual = st.checkbox("Manual threshold", value=True)
+    show_otsu = st.checkbox("Otsu (auto)", value=True)
+    min_val, max_val = float(np.min(band_img)), float(np.max(band_img))
+    user_threshold = st.slider("Manual threshold value", min_val, max_val, float(0), step=0.01) if show_manual else 0.0
+    mask_manual = band_img > user_threshold if show_manual else None
+    mask_otsu = band_img > threshold_otsu(band_img) if show_otsu else None
+    # Show before/after images
     col_before, col_after = st.columns(2)
     with col_before:
         st.markdown("**Before (Raw Band)**")
@@ -106,12 +52,60 @@ def show_datacube_page():
         st.pyplot(fig)
     with col_after:
         st.markdown("**After (Background Removed)**")
-        masked_img = np.where(mask, band_img, 0)
-        st.image(Image.fromarray(((masked_img - masked_img[mask].min()) * (255.0 / (masked_img[mask].max() - masked_img[mask].min()+1e-6))).astype(np.uint8), mode='L'), use_container_width=True)
+        if show_manual:
+            masked_img = np.where(mask_manual, band_img, 0)
+            st.image(Image.fromarray(((masked_img - masked_img[mask_manual].min()) * (255.0 / (masked_img[mask_manual].max() - masked_img[mask_manual].min()+1e-6))).astype(np.uint8), mode='L'), use_container_width=True)
+        if show_otsu:
+            masked_img_otsu = np.where(mask_otsu, band_img, 0)
+            st.image(Image.fromarray(((masked_img_otsu - masked_img_otsu[mask_otsu].min()) * (255.0 / (masked_img_otsu[mask_otsu].max() - masked_img_otsu[mask_otsu].min()+1e-6))).astype(np.uint8), mode='L'), use_container_width=True)
         fig, ax = plt.subplots(figsize=(4,2))
-        ax.hist(masked_img[mask].flatten(), bins=50, color='#e377c2', alpha=0.7)
+        if show_manual:
+            ax.hist(band_img[mask_manual].flatten(), bins=50, color='#2ca02c', alpha=0.5, label='Manual')
+        if show_otsu:
+            ax.hist(band_img[mask_otsu].flatten(), bins=50, color='#ff7f0e', alpha=0.5, label='Otsu')
         ax.set_title(f"Histogram (Foreground Only)")
+        ax.legend()
         st.pyplot(fig)
+    # Prepare cubes for 3D explorer
+    st.markdown("---")
+    st.subheader("3D Cube Explorer (After Background Removal)")
+    # Compose cube_fg for 3D explorer (overlay if multiple selected)
+    cubes_to_show = []
+    if show_raw:
+        cubes_to_show.append(("Raw", cube))
+    if show_manual:
+        cubes_to_show.append((f"Manual (>{user_threshold:.2f})", cube * mask_manual[..., None]))
+    if show_otsu:
+        otsu_thr = threshold_otsu(band_img)
+        cubes_to_show.append((f"Otsu (>{otsu_thr:.2f})", cube * mask_otsu[..., None]))
+    for label, cube_fg in cubes_to_show:
+        # Downsample for performance if needed
+        max_dim = 64
+        ds_cube = cube_fg
+        if max(ds_cube.shape) > max_dim:
+            factors = [max(1, s // max_dim) for s in ds_cube.shape]
+            ds_cube = ds_cube[::factors[0], ::factors[1], ::factors[2]]
+        fig3d = go.Figure(data=go.Volume(
+            x=np.repeat(np.arange(ds_cube.shape[1]), ds_cube.shape[0]*ds_cube.shape[2]),
+            y=np.tile(np.repeat(np.arange(ds_cube.shape[0]), ds_cube.shape[2]), ds_cube.shape[1]),
+            z=np.tile(np.arange(ds_cube.shape[2]), ds_cube.shape[0]*ds_cube.shape[1]),
+            value=ds_cube.transpose(1,0,2).flatten(),
+            opacity=0.1,
+            surface_count=10,
+            colorscale='Viridis',
+        ))
+        fig3d.update_layout(
+            width=500, height=500,
+            scene=dict(
+                xaxis_title='X',
+                yaxis_title='Y',
+                zaxis_title='Band',
+                aspectmode='cube',
+            ),
+            margin=dict(l=0, r=0, b=0, t=0),
+            title=label
+        )
+        st.plotly_chart(fig3d, use_container_width=True)
 
     st.markdown("---")
     st.subheader("Advanced Visualization & Export")
@@ -123,7 +117,7 @@ def show_datacube_page():
         export_csv = st.checkbox("Export Current Band as CSV", value=False)
 
     # Normalize for display (foreground only)
-    fg_pixels = band_img[mask]
+    fg_pixels = band_img[mask_manual] if show_manual else band_img[mask_otsu]
     if auto_contrast and fg_pixels.size > 0:
         p2, p98 = np.percentile(fg_pixels, (2, 98))
         band_img_norm = np.clip((band_img - p2) * 255.0 / (p98 - p2), 0, 255)
