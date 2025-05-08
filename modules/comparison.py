@@ -3,8 +3,7 @@ import numpy as np
 import os
 from spectral import envi
 from skimage.filters import threshold_otsu
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 from scipy.fft import fft
 
@@ -99,7 +98,6 @@ def show_comparison_page():
     deriv2s = []
     crs = []
     fft_mags = []
-    wavelengths_list = []
     for cdict in cubes:
         cube = cdict['cube']
         metadata = cdict['metadata']
@@ -128,20 +126,39 @@ def show_comparison_page():
         deriv2s.append((cdict['label'], deriv2, wavelengths))
         crs.append((cdict['label'], cr, wavelengths))
         fft_mags.append((cdict['label'], fft_mag, None))
-    # Overlay plots
+    # Overlay plots using Plotly
     def overlay_plot(data_list, title, ylabel, latex_exp, x_label="Wavelength (nm)"):
         st.markdown(f"**{title}**")
         st.latex(latex_exp)
-        fig, ax = plt.subplots()
-        for label, y, wl in data_list:
+        fig = go.Figure()
+        # Define a distinct color palette
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        for i, (label, y, wl) in enumerate(data_list):
             x = wl if wl is not None and len(wl) == len(y) else np.arange(len(y))
-            ax.plot(x, y, label=label)
-        ax.set_title(title)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(ylabel)
-        ax.legend()
-        ax.grid(True)
-        st.pyplot(fig)
+            fig.add_trace(go.Scatter(
+                x=x, 
+                y=y, 
+                mode='lines', 
+                name=label,
+                line=dict(
+                    color=colors[i % len(colors)],
+                    width=2
+                )
+            ))
+        fig.update_layout(
+            title=title, 
+            xaxis_title=x_label, 
+            yaxis_title=ylabel,
+            template='plotly_white',
+            showlegend=True,
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True)
     overlay_plot(avg_spectra, "Average Spectrum", "Reflectance", r"\bar{S}_{fg}(\lambda) = \frac{1}{N_{fg}} \sum_{i \in fg} S_i(\lambda)")
     overlay_plot(deriv1s, "1st Derivative", "d(Reflectance)/d\lambda", r"S'(\lambda) = \frac{d\bar{S}_{fg}}{d\lambda}")
     overlay_plot(deriv2s, "2nd Derivative", "d^2(Reflectance)/d\lambda^2", r"S''(\lambda) = \frac{d^2\bar{S}_{fg}}{d\lambda^2}")
