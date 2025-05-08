@@ -5,6 +5,7 @@ from modules.visualization import show_visualization_page
 from modules.inference import show_inference_page
 from modules.about import show_about_page
 from modules.datacube import show_datacube_page
+from modules.comparison import show_comparison_page
 from modules.components import show_help_page, show_feedback_page
 import yaml
 
@@ -42,6 +43,7 @@ main_screen_options = {
     "Camera Control": "📷 Camera Control",
     "Data Visualization": "📊 Data Visualization",
     "Datacube": "🗂️ Datacube Viewer",
+    "Comparison": "🔬 Cube Comparison",
     "Inference Engine": "🧠 Inference Engine",
     "About": "👥 About Us"
 }
@@ -94,6 +96,8 @@ elif active_screen_to_display == "Data Visualization":
     show_visualization_page()
 elif active_screen_to_display == "Datacube":
     show_datacube_page()
+elif active_screen_to_display == "Comparison":
+    show_comparison_page()
 elif active_screen_to_display == "Inference Engine":
     show_inference_page()
 elif active_screen_to_display == "About":
