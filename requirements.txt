@@ -5,3 +5,5 @@ plotly
 spectral
 Pillow
 opencv-python 
+matplotlib
+scikit-image
