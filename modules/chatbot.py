@@ -36,20 +36,102 @@ def get_gemini_model():
     return genai.GenerativeModel('gemini-1.5-flash')
 
 def show_chatbot():
-    st.markdown("---")
-    st.markdown("<div style='text-align:center; font-size:1.2em;'><b>💬 Kiwi Assistant</b> &nbsp;|&nbsp; Ask me about the app, code, or graphs!</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    .chat-container {
+        border-radius: 10px;
+        padding: 20px;
+        background: linear-gradient(145deg, #f0f2f6, #ffffff);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin: 20px 0;
+    }
+    .chat-header {
+        text-align: center;
+        font-size: 1.2em;
+        margin-bottom: 20px;
+        color: #1f77b4;
+    }
+    .user-message {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #1f77b4;
+    }
+    .assistant-message {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #2ca02c;
+    }
+    .typing-animation {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #2ca02c;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .reset-button {
+        background-color: #ff4b4b;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .reset-button:hover {
+        background-color: #ff3333;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    st.markdown('<div class="chat-header"><b>💬 Kiwi Assistant</b> &nbsp;|&nbsp; Ask me about the app, code, or graphs!</div>', unsafe_allow_html=True)
+
+    # Add reset button
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("🔄 Reset Chat", key="reset_chat"):
+            st.session_state.chat_history = []
+            st.rerun()
+
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
+
     model = get_gemini_model()
     context = get_codebase_context()
+
+    # Display chat history with custom styling
     for msg in st.session_state.chat_history:
-        st.chat_message(msg['role']).write(msg['content'])
+        if msg['role'] == 'user':
+            st.markdown(f'<div class="user-message">👤 <b>You:</b><br>{msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="assistant-message">🤖 <b>Kiwi Assistant:</b><br>{msg["content"]}</div>', unsafe_allow_html=True)
+
+    # Chat input with custom styling
     user_input = st.chat_input("Ask me anything about Apteryx, the code, or the graphs...")
+
     if user_input and model:
         st.session_state.chat_history.append({'role': 'user', 'content': user_input})
-        with st.chat_message('assistant'):
-            with st.spinner("Thinking..."):
-                prompt = f"""
+        st.markdown(f'<div class="user-message">👤 <b>You:</b><br>{user_input}</div>', unsafe_allow_html=True)
+
+        # Show typing animation
+        typing_placeholder = st.empty()
+        typing_placeholder.markdown('<div class="typing-animation"></div>', unsafe_allow_html=True)
+
+        prompt = f"""
 You are Kiwi Assistant, a helpful AI for the Apteryx hyperspectral imaging app. You can:
 - Explain any graph or feature in the app
 - Help users understand the codebase (see context below)
@@ -60,10 +142,13 @@ Codebase context:
 
 User question: {user_input}
 """
-                try:
-                    response = model.generate_content(prompt)
-                    answer = response.text
-                except Exception as e:
-                    answer = f"Sorry, I couldn't get an answer from Gemini: {e}"
-                st.write(answer)
-                st.session_state.chat_history.append({'role': 'assistant', 'content': answer}) 
+        try:
+            response = model.generate_content(prompt)
+            answer = response.text
+        except Exception as e:
+            answer = f"Sorry, I couldn't get an answer from Gemini: {e}"
+
+        # Remove typing animation and show response
+        typing_placeholder.empty()
+        st.markdown(f'<div class="assistant-message">🤖 <b>Kiwi Assistant:</b><br>{answer}</div>', unsafe_allow_html=True)
+        st.session_state.chat_history.append({'role': 'assistant', 'content': answer}) 
