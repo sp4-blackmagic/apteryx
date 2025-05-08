@@ -11,11 +11,6 @@ def show_datacube_page():
     st.header("🗂️ Datacube Viewer")
     st.markdown("---")
     st.subheader("3D Cube Explorer")
-    st.markdown("""
-    The 3D Cube Explorer visualizes the hyperspectral datacube in three dimensions (X, Y, Band). 
-    To focus on the kiwi fruit, we automatically remove the background using Otsu's thresholding on the middle band. 
-    Only the foreground (kiwi) is shown in the 3D visualization below.
-    """)
 
     # Use the last preview datacube if available, else fallback to a random kiwi
     cube = st.session_state.get('last_preview_cube', None)
@@ -37,42 +32,33 @@ def show_datacube_page():
         except Exception:
             wavelengths = None
 
-    # --- Lazy loading indicator ---
-    with st.spinner("Preparing 3D cube visualization (removing background with Otsu)..."):
-        # Remove background using Otsu on the middle band
-        rep_band_idx = bands // 2
-        rep_band = cube[:, :, rep_band_idx]
-        threshold = threshold_otsu(rep_band)
-        mask = rep_band > threshold
-        # Apply mask to all bands
-        cube_fg = np.where(mask[:, :, None], cube, 0)
-        # Downsample for performance if needed
-        max_dim = 64
-        ds_cube = cube_fg
-        if max(ds_cube.shape) > max_dim:
-            factors = [max(1, s // max_dim) for s in ds_cube.shape]
-            ds_cube = ds_cube[::factors[0], ::factors[1], ::factors[2]]
-        # 3D Cube
-        fig3d = go.Figure(data=go.Volume(
-            x=np.repeat(np.arange(ds_cube.shape[1]), ds_cube.shape[0]*ds_cube.shape[2]),
-            y=np.tile(np.repeat(np.arange(ds_cube.shape[0]), ds_cube.shape[2]), ds_cube.shape[1]),
-            z=np.tile(np.arange(ds_cube.shape[2]), ds_cube.shape[0]*ds_cube.shape[1]),
-            value=ds_cube.transpose(1,0,2).flatten(),
-            opacity=0.1,
-            surface_count=10,
-            colorscale='Viridis',
-        ))
-        fig3d.update_layout(
-            width=500, height=500,
-            scene=dict(
-                xaxis_title='X',
-                yaxis_title='Y',
-                zaxis_title='Band',
-                aspectmode='cube',
-            ),
-            margin=dict(l=0, r=0, b=0, t=0)
-        )
-        st.plotly_chart(fig3d, use_container_width=True)
+    # Downsample for performance if needed
+    max_dim = 64
+    ds_cube = cube
+    if max(ds_cube.shape) > max_dim:
+        factors = [max(1, s // max_dim) for s in ds_cube.shape]
+        ds_cube = ds_cube[::factors[0], ::factors[1], ::factors[2]]
+    # 3D Cube
+    fig3d = go.Figure(data=go.Volume(
+        x=np.repeat(np.arange(ds_cube.shape[1]), ds_cube.shape[0]*ds_cube.shape[2]),
+        y=np.tile(np.repeat(np.arange(ds_cube.shape[0]), ds_cube.shape[2]), ds_cube.shape[1]),
+        z=np.tile(np.arange(ds_cube.shape[2]), ds_cube.shape[0]*ds_cube.shape[1]),
+        value=ds_cube.transpose(1,0,2).flatten(),
+        opacity=0.1,
+        surface_count=10,
+        colorscale='Viridis',
+    ))
+    fig3d.update_layout(
+        width=500, height=500,
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Band',
+            aspectmode='cube',
+        ),
+        margin=dict(l=0, r=0, b=0, t=0)
+    )
+    st.plotly_chart(fig3d, use_container_width=True)
 
     st.markdown("---")
     st.subheader("Band Selection & Background Removal")
