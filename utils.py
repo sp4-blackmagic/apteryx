@@ -23,8 +23,7 @@ def load_spectral_data(bin_file):
 
 def spectral_to_rgb(spectral_data):
     """Convert spectral data to approximate RGB values."""
-    # This is a simplified conversion - in reality, you'd want to use proper spectral response curves
-    # For demonstration, we'll use a simple weighted average of bands
+    # This is a simplified conversion 
     if len(spectral_data.shape) == 3:
         # Assuming the data is in format (height, width, bands)
         # Simple RGB approximation using different bands
