@@ -9,3 +9,5 @@ matplotlib
 scikit-image
 pyyaml
 scipy
+python-dotenv
+google-generativeai

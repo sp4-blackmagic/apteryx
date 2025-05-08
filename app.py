@@ -8,6 +8,7 @@ from modules.datacube import show_datacube_page
 from modules.comparison import show_comparison_page
 from modules.kiwi_benefits import show_kiwi_benefits_page
 from modules.components import show_help_page, show_feedback_page
+from modules.chatbot import show_chatbot
 import yaml
 
 # --- Page Configuration ---
@@ -147,3 +148,6 @@ def show_feedback_page():
                 print(f"Feedback Received:\nType: {feedback_type}\nEmail: {feedback_email}\nMessage: {feedback_text}")
             else:
                 st.error("Please enter your feedback before submitting.")
+
+# At the very end of the main app logic, after all page rendering:
+show_chatbot()
