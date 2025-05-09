@@ -58,6 +58,8 @@ fi
 #     exit 1
 # fi
 
+uv add -r requirements.txt
+
 # Goodbye message
 cat <<'EOF'
 ========================================
