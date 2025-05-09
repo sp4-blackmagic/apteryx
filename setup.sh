@@ -26,14 +26,14 @@ if [[ $(echo -e "$PYTHON_VERSION\n$REQUIRED_VERSION" | sort -V | head -n1) != "$
     exit 1
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d ".venv" ]; then
-    echo "[INFO] Creating virtual environment..."
-    python3 -m venv .venv
-fi
+# # Create virtual environment if it doesn't exist
+# if [ ! -d ".venv" ]; then
+#     echo "[INFO] Creating virtual environment..."
+#     python3 -m venv .venv
+# fi
 
-# Activate virtual environment
-source .venv/bin/activate
+# # Activate virtual environment
+# source .venv/bin/activate
 
 # Check for uv
 if ! command -v uv &> /dev/null; then
@@ -43,20 +43,22 @@ if ! command -v uv &> /dev/null; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
-# Check for requirements.txt
-if [ ! -f "requirements.txt" ]; then
-    echo "[ERROR] requirements.txt not found! Please provide one."
-    exit 1
-fi
+# # Check for requirements.txt
+# if [ ! -f "requirements.txt" ]; then
+#     echo "[ERROR] requirements.txt not found! Please provide one."
+#     exit 1
+# fi
 
 # Install dependencies using uv
-uv pip install -r requirements.txt
+# uv pip install -r requirements.txt
 
-# Check for streamlit
-if ! python -c "import streamlit" &> /dev/null; then
-    echo "[ERROR] Streamlit is not installed. Please check your requirements.txt."
-    exit 1
-fi
+# # Check for streamlit
+# if ! python -c "import streamlit" &> /dev/null; then
+#     echo "[ERROR] Streamlit is not installed. Please check your requirements.txt."
+#     exit 1
+# fi
+
+uv add -r requirements.txt
 
 # Goodbye message
 cat <<'EOF'
@@ -66,4 +68,4 @@ cat <<'EOF'
 EOF
 
 # Run the app
-streamlit run app.py 
+uv run streamlit run app.py 
