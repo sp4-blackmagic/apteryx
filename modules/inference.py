@@ -4,8 +4,17 @@ import pandas as pd
 import plotly.express as px
 import time
 import plotly.graph_objects as go
+import httpx
+import asyncio
+import json
 
-# Model leaderboard data
+# TODO: update / make this more dynamic
+INFERENCE_API_BASE_URL = "http://192.168.2.2:6969"  # Updated base API URL
+STORAGE_API_URL = "http://192.168.2.11:8000/download_item/" # Storage API URL
+
+
+
+# Model leaderboard data (kept for leaderboard display)
 MODEL_DATA = [
     # task, model, r2, rmse, f1, mcc, time
     ["firmness", "CatBoost", 0.8321, 0.6898, 0.8208, 0.5951, 120.39],
@@ -55,10 +64,77 @@ MODEL_DF = pd.DataFrame(MODEL_DATA, columns=MODEL_COLUMNS)
 RIPENESS_LABELS = ["unripe", "perfect", "overripe"]
 FIRMNESS_LABELS = ["too soft", "perfect", "too hard"]
 
+async def get_model_types(api_base_url: str) -> list[str]:
+    """
+    Asynchronously fetch available model types from the API.
+    """
+    endpoint = f"{api_base_url}/model_types"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(endpoint)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        st.error(f"HTTP error occurred while fetching model types: {e}")
+        return []
+    except Exception as e:
+        st.error(f"Error fetching model types: {e}")
+        return []
+
+async def call_inference(api_base_url: str, file_uid: str, models: list, storage_api_url: str) -> dict:
+    """
+    Asynchronously run inference via the API.
+    """
+    endpoint = f"{api_base_url}/evaluate/"
+    
+    try:
+        payload = {
+            "file_uid": file_uid,
+            "models": models,
+            "storage_api_url": storage_api_url
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(endpoint, json=payload)
+            response.raise_for_status()
+            results = response.json()
+            print(results) # Keep for debugging, can be removed later
+            return results
+
+    except httpx.HTTPStatusError as e:
+        st.error(f"HTTP error occurred: {e.response.text if e.response else e}")
+        # raise Exception(f"API request failed: {str(e)}") # Avoid raising to allow UI to handle
+        return {"error": f"API request failed: {str(e)}", "details": e.response.text if e.response else "No response details"}
+    except Exception as e:
+        st.error(f"Error calling inference API: {e}")
+        # raise Exception(f"Inference failed: {str(e)}") # Avoid raising
+        return {"error": f"Inference failed: {str(e)}"}
 
 def show_inference_page():
     st.header("🧠 Inference Engine")
     st.markdown("---")
+
+    # Fetch model types
+    if "available_models" not in st.session_state:
+        st.session_state.available_models = []
+    
+    # Button to refresh model list
+    if st.button("Refresh Model List"):
+        api_url_for_models = st.session_state.get("inference_api_url", INFERENCE_API_BASE_URL)
+        st.session_state.available_models = asyncio.run(get_model_types(api_url_for_models))
+        if not st.session_state.available_models:
+            st.warning("Could not fetch model list from the server. Please check the API URL or try again.")
+        else:
+            st.success(f"Fetched {len(st.session_state.available_models)} models.")
+            st.rerun() # Rerun to update model selection UI
+
+    # Initialize model list if empty and not yet fetched
+    if not st.session_state.available_models:
+        api_url_for_models = st.session_state.get("inference_api_url", INFERENCE_API_BASE_URL)
+        st.session_state.available_models = asyncio.run(get_model_types(api_url_for_models))
+        if not st.session_state.available_models:
+            st.warning("Could not fetch model list initially. Try refreshing.")
+
 
     # 1. Preview from Camera Control
     st.subheader("1. Preview from Camera Control")
@@ -100,104 +176,297 @@ def show_inference_page():
 
     st.markdown("---")
     st.subheader("3. Select Task and Model")
-    # Task selection as radio
-    task = st.radio("Prediction Task", ["firmness", "ripeness", "both"], horizontal=True)
+    task = st.radio("Prediction Task", ["firmness", "ripeness", "both"], horizontal=True, key="task_selection")
 
-    # Model selection as checkboxes
     st.markdown("<b>Select Model(s):</b>", unsafe_allow_html=True)
-    model_options_firm = list(MODEL_DF[MODEL_DF["Task"]=="firmness"]["Model"].unique())
-    model_options_ripe = list(MODEL_DF[MODEL_DF["Task"]=="ripeness"]["Model"].unique())
-    selected_models_firm = []
-    selected_models_ripe = []
-    if task in ["firmness", "both"]:
-        st.write("Firmness Models:")
-        for m in model_options_firm:
-            if st.checkbox(m, key=f"firm_{m}"):
-                selected_models_firm.append(m)
-    if task in ["ripeness", "both"]:
-        st.write("Ripeness Models:")
-        for m in model_options_ripe:
-            if st.checkbox(m, key=f"ripe_{m}"):
-                selected_models_ripe.append(m)
+    
+    selected_models = []
+    if not st.session_state.available_models:
+        st.info("No models available for selection. Please refresh the model list or check API connectivity.")
+    else:
+        # Create columns for model selection for better layout if many models
+        num_cols = 3 # Adjust as needed
+        cols = st.columns(num_cols)
+        for i, model_name in enumerate(st.session_state.available_models):
+            if cols[i % num_cols].checkbox(model_name, key=f"model_{model_name}"):
+                selected_models.append(model_name)
+    
+    # The old logic for selected_models_firm and selected_models_ripe is replaced
+    # Now, selected_models contains all chosen models. The backend will handle task assignment.
 
     st.markdown("---")
     st.subheader("4. Run Prediction")
+
     # Only allow prediction if image is available and at least one model is selected
-    can_predict = camera_img is not None and ((selected_models_firm or selected_models_ripe))
+    can_predict = st.session_state.get("current_image") is not None and selected_models
+
     if not can_predict:
         st.warning("Please capture an image and select at least one model to run prediction.")
     else:
         if st.button("🥝 Run Prediction", type="primary", key="predict_btn"):
-            with st.spinner("Running inference... (Simulated)"):
-                time.sleep(2.0)
-                results = {}
-                confidences = {}
-                if task in ["firmness", "both"]:
-                    firm_idx = np.random.choice([0,1,2], p=[0.2,0.6,0.2])
-                    firm_label = FIRMNESS_LABELS[firm_idx]
-                    firm_conf = np.random.dirichlet(np.ones(3),size=1)[0]
-                    results["firmness"] = firm_label
-                    confidences["firmness"] = firm_conf
-                if task in ["ripeness", "both"]:
-                    ripe_idx = np.random.choice([0,1,2], p=[0.2,0.6,0.2])
-                    ripe_label = RIPENESS_LABELS[ripe_idx]
-                    ripe_conf = np.random.dirichlet(np.ones(3),size=1)[0]
-                    results["ripeness"] = ripe_label
-                    confidences["ripeness"] = ripe_conf
-                st.session_state.infer_results = results
-                st.session_state.infer_confidences = confidences
-                st.session_state.pred_time = "2.00 seconds"
-                st.session_state.prediction_done = True
+            start_time = time.time()
+            
+            #TODO: when storage API is ready, use the file_uid from session state
+            # file_uid = st.session_state.get("current_file_uid", "sample_data") # Ensure this is set appropriately
+            file_uid = "20250531134318327-d5b5f0252d"
 
-    # Show prediction results
+            api_base_url = st.session_state.get("inference_api_url", INFERENCE_API_BASE_URL)
+            
+            with st.spinner("Running inference..."):
+                try:
+                    api_result = asyncio.run(call_inference(api_base_url, file_uid, selected_models, STORAGE_API_URL))
+
+                    # Raw API response will be stored in session state and displayed later
+                    # st.subheader("Raw API Response:")
+                    # st.json(api_result)
+                    st.session_state.raw_api_result = api_result # Store for later display
+
+                    print(f"API Result: {api_result}")  # Keep for debugging, can be removed later
+                    
+                    if "error" in api_result:
+                        st.error(f"API Error: {api_result['error']}")
+                        if "details" in api_result:
+                            st.json(api_result['details'])
+                        st.session_state.prediction_done = False # Ensure results are not shown
+                        return # Stop further processing
+
+                    # Initialize error collection
+                    detailed_error_messages = []
+                    
+                    results = {}
+                    confidences = {}
+                    model_confidences = {"firmness": {}, "ripeness": {}}
+                    
+                    st.write("Selected prediction task:", task) # Display the selected task
+
+                    if "results" in api_result and isinstance(api_result["results"], dict):
+                        # Assuming the "0" key is consistent for the first (and likely only) item in batch
+                        item_results = api_result["results"].get("0", {})
+                        
+                        for model_name_from_api, model_data in item_results.items():
+                            if model_name_from_api not in selected_models: # Process only selected models' results
+                                continue
+
+                            # Process firmness predictions
+                            if "firmness" in model_data and (task == "firmness" or task == "both"):
+                                firm_data = model_data["firmness"]
+                                if firm_data.get("status") == "success":
+                                    if "firmness" not in results: # Take first successful model's prediction as primary
+                                        results["firmness"] = firm_data["prediction_readable"]
+                                        confidences["firmness"] = firm_data["prediction_proba"][0] if firm_data.get("prediction_proba") else [0,0,0]
+                                    model_confidences["firmness"][model_name_from_api] = firm_data["prediction_proba"][0] if firm_data.get("prediction_proba") else [0,0,0]
+                                elif firm_data.get("status") == "error":
+                                    detailed_error_messages.append(f"Firmness ({model_name_from_api}): {firm_data.get('message', 'Unknown error')}")
+                            
+                            # Process ripeness predictions
+                            if "ripeness_state" in model_data and (task == "ripeness" or task == "both"):
+                                ripe_data = model_data["ripeness_state"]
+                                if ripe_data.get("status") == "success":
+                                    if "ripeness" not in results: # Take first successful model's prediction as primary
+                                        results["ripeness"] = ripe_data["prediction_readable"]
+                                        confidences["ripeness"] = ripe_data["prediction_proba"][0] if ripe_data.get("prediction_proba") else [0,0,0]
+                                    model_confidences["ripeness"][model_name_from_api] = ripe_data["prediction_proba"][0] if ripe_data.get("prediction_proba") else [0,0,0]
+                                elif ripe_data.get("status") == "error":
+                                    detailed_error_messages.append(f"Ripeness ({model_name_from_api}): {ripe_data.get('message', 'Unknown error')}")
+                        
+                        st.subheader("Processed Data (before session state):")
+                        
+                        if results:
+                            st.write("`results` (primary readable predictions):")
+                            try:
+                                results_df = pd.DataFrame(list(results.items()), columns=["Task", "Prediction"])
+                                st.dataframe(results_df, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error displaying results table: {e}")
+                                st.json(results) # Fallback to JSON
+                        else:
+                            st.write("`results`: No primary predictions.")
+
+                        if confidences:
+                            st.write("`confidences` (primary model probabilities):")
+                            for task_name, probs in confidences.items():
+                                st.markdown(f"**Task: {task_name}**")
+                                labels = FIRMNESS_LABELS if task_name == "firmness" else RIPENESS_LABELS
+                                if isinstance(probs, list) and len(probs) == len(labels):
+                                    try:
+                                        # Format probabilities
+                                        formatted_probs = [f"{p*100:.2f}%" for p in probs]
+                                        conf_df = pd.DataFrame({'Label': labels, 'Probability': formatted_probs})
+                                        st.dataframe(conf_df, use_container_width=True)
+                                    except Exception as e:
+                                        st.error(f"Error displaying confidences table for {task_name}: {e}")
+                                        st.json({task_name: probs}) # Fallback
+                                else:
+                                    st.write(f"Probabilities for {task_name}:")
+                                    st.json(probs) # Fallback if not list or length mismatch
+                        else:
+                            st.write("`confidences`: No primary confidences.")
+
+                        if model_confidences:
+                            st.write("`model_confidences` (all model probabilities):")
+                            for task_name, task_models in model_confidences.items():
+                                if not task_models:
+                                    st.markdown(f"**Task: {task_name}** - No model confidences.")
+                                    continue
+                                st.markdown(f"**Task: {task_name}**")
+                                labels = FIRMNESS_LABELS if task_name == "firmness" else RIPENESS_LABELS
+                                
+                                table_data = []
+                                for model_name, probs in task_models.items():
+                                    if isinstance(probs, list) and len(probs) == len(labels):
+                                        row = {'Model': model_name}
+                                        for i, label in enumerate(labels):
+                                            # Format probabilities
+                                            row[label] = f"{probs[i]*100:.2f}%"
+                                        table_data.append(row)
+                                    else:
+                                        st.write(f"Model: {model_name}, Probabilities for task {task_name}:")
+                                        st.json(probs) # Fallback
+
+                                if table_data:
+                                    try:
+                                        model_conf_df = pd.DataFrame(table_data)
+                                        st.dataframe(model_conf_df, use_container_width=True)
+                                    except Exception as e:
+                                        st.error(f"Error displaying model_confidences table for {task_name}: {e}")
+                                        st.json({task_name: task_models}) # Fallback
+                                elif not task_models: # Already handled above, but as a safeguard
+                                    pass # No data to show for this task if task_models was empty
+                                elif task_models and not table_data: # task_models had items, but none were processable
+                                    st.write(f"Could not format model confidences for task {task_name} into a table.")
+
+
+                        else:
+                            st.write("`model_confidences`: No model confidences.")
+                        
+                        st.session_state.infer_results = results
+                        st.session_state.infer_confidences = confidences
+                        st.session_state.model_confidences = model_confidences
+                        st.session_state.pred_time = f"{time.time() - start_time:.2f} seconds"
+                        st.session_state.prediction_done = True
+                        
+                        # Display errors or warnings based on prediction outcome
+                        if not results: # No primary predictions were successful for any requested task
+                            if detailed_error_messages:
+                                st.error("No successful predictions were made. Specific errors encountered from models:")
+                                for msg in detailed_error_messages:
+                                    st.error(f"- {msg}")
+                            else:
+                                # This case means no models returned 'success' and no models returned 'error' with a message.
+                                st.warning("No successful predictions were made for the selected task(s) and model(s). "
+                                           "This could be due to model incompatibility with the task, issues processing the input data, "
+                                           "or server-side configuration problems. Check API logs for more details.")
+                        elif detailed_error_messages: # Some primary predictions were successful, but some models/tasks had errors
+                            st.warning("Partial success: Primary predictions are available for some tasks, but some models/tasks encountered errors.")
+                            st.warning("Details of errors reported by models:")
+                            for msg in detailed_error_messages:
+                                st.warning(f"- {msg}")
+                        # If results is not empty and detailed_error_messages is empty, it's a full success, no extra message needed here.
+                        
+                        # st.rerun() # This was likely causing the results to blink and disappear
+                    else:
+                        st.error("Invalid response format from API or no results found.")
+                        st.json(api_result) 
+                
+                except Exception as e:
+                    st.error(f"Error during inference: {str(e)}")
+                    st.session_state.prediction_done = False
+
+
     if st.session_state.get("prediction_done", False):
         st.markdown("---")
         st.subheader("Prediction Results")
-        # If multiple models, show confidence for each
-        if (len(selected_models_firm) > 1 or len(selected_models_ripe) > 1):
-            st.markdown("**Confidence for Each Selected Model**")
-            cols = st.columns(max(len(selected_models_firm), len(selected_models_ripe), 2))
-            idx = 0
-            if len(selected_models_firm) > 1:
-                for m in selected_models_firm:
-                    conf = np.random.dirichlet(np.ones(3),size=1)[0]
-                    cols[idx].plotly_chart(
-                        px.bar(x=FIRMNESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
-                               title=f"Firmness Confidence ({m})", color=FIRMNESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
-                        use_container_width=True
-                    )
-                    idx += 1
-            if len(selected_models_ripe) > 1:
-                for m in selected_models_ripe:
-                    conf = np.random.dirichlet(np.ones(3),size=1)[0]
-                    cols[idx].plotly_chart(
-                        px.bar(x=RIPENESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
-                               title=f"Ripeness Confidence ({m})", color=RIPENESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
-                        use_container_width=True
-                    )
-                    idx += 1
-        # Original single-model logic
-        cols = st.columns(2 if task!="both" else 3)
-        idx = 0
-        if "firmness" in st.session_state.infer_results:
-            cols[idx].metric("Firmness", st.session_state.infer_results["firmness"])
-            conf = st.session_state.infer_confidences["firmness"]
-            cols[idx].plotly_chart(
-                px.bar(x=FIRMNESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
-                       title="Firmness Confidence", color=FIRMNESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
-                use_container_width=True
-            )
-            idx += 1
-        if "ripeness" in st.session_state.infer_results:
-            cols[idx].metric("Ripeness", st.session_state.infer_results["ripeness"])
-            conf = st.session_state.infer_confidences["ripeness"]
-            cols[idx].plotly_chart(
-                px.bar(x=RIPENESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
-                       title="Ripeness Confidence", color=RIPENESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
-                use_container_width=True
-            )
-            idx += 1
-        cols[idx].info(f"Time to generate prediction: {st.session_state.pred_time}")
+        
+        model_confidences = st.session_state.get("model_confidences", {"firmness": {}, "ripeness": {}})
+        infer_results = st.session_state.get("infer_results", {})
+
+        # Display individual model confidences if multiple models were involved for a task
+        # This logic needs to know which models were selected for which task, or show all selected models' confidences
+        
+        # Simplified: Show confidence for all selected models that returned results
+        # This part might need refinement based on how `selected_models` (which is now a flat list)
+        # maps to tasks if a user selects "both" tasks.
+        # For now, we iterate through `model_confidences` which is already populated correctly.
+
+        num_selected_displayable_firmness = len(model_confidences.get("firmness", {}))
+        num_selected_displayable_ripeness = len(model_confidences.get("ripeness", {}))
+
+        if num_selected_displayable_firmness > 1 or num_selected_displayable_ripeness > 1 :
+            st.markdown("**Confidence for Each Successful Model**")
+            
+            # Determine max columns needed
+            max_cols_needed = 0
+            if task in ["firmness", "both"] and num_selected_displayable_firmness > 0:
+                max_cols_needed = max(max_cols_needed, num_selected_displayable_firmness)
+            if task in ["ripeness", "both"] and num_selected_displayable_ripeness > 0:
+                 max_cols_needed = max(max_cols_needed, num_selected_displayable_ripeness)
+            
+            if max_cols_needed == 0 and (num_selected_displayable_firmness > 0 or num_selected_displayable_ripeness > 0) : # if only one model gave result for one task
+                 pass # will be handled by single model logic
+            elif max_cols_needed > 0:
+                cols = st.columns(max_cols_needed if max_cols_needed > 1 else 2) # Ensure at least 2 cols if section is shown
+                col_idx = 0
+
+                if task in ["firmness", "both"] and model_confidences.get("firmness"):
+                    for model_name, conf_values in model_confidences["firmness"].items():
+                        if col_idx < len(cols): # Check to prevent IndexError if too many models for columns
+                            cols[col_idx].plotly_chart(
+                                px.bar(x=FIRMNESS_LABELS, y=conf_values, labels={"x":"Label","y":"Confidence"},
+                                    title=f"Firmness ({model_name})", color=FIRMNESS_LABELS, 
+                                    color_discrete_sequence=px.colors.qualitative.Pastel),
+                                use_container_width=True
+                            )
+                            col_idx +=1
+                        else: # Fallback if more models than columns
+                            st.plotly_chart(px.bar(x=FIRMNESS_LABELS, y=conf_values, labels={"x":"Label","y":"Confidence"}, title=f"Firmness ({model_name})", color=FIRMNESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel), use_container_width=True)
+
+
+                col_idx = 0 # Reset for ripeness if firmness was also shown in same row of columns
+                if task in ["ripeness", "both"] and model_confidences.get("ripeness"):
+                    for model_name, conf_values in model_confidences["ripeness"].items():
+                        if col_idx < len(cols):
+                            cols[col_idx].plotly_chart(
+                                px.bar(x=RIPENESS_LABELS, y=conf_values, labels={"x":"Label","y":"Confidence"},
+                                    title=f"Ripeness ({model_name})", color=RIPENESS_LABELS,
+                                    color_discrete_sequence=px.colors.qualitative.Pastel),
+                                use_container_width=True
+                            )
+                            col_idx +=1
+                        else:
+                             st.plotly_chart(px.bar(x=RIPENESS_LABELS, y=conf_values, labels={"x":"Label","y":"Confidence"}, title=f"Ripeness ({model_name})", color=RIPENESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel), use_container_width=True)
+
+
+        # Display primary prediction (from the first successful model for each task)
+        display_cols = st.columns(3) # For Firmness, Ripeness, Time
+        current_col = 0
+        
+        if "firmness" in infer_results:
+            display_cols[current_col].metric("Firmness Prediction", infer_results["firmness"])
+            if "firmness" in st.session_state.infer_confidences:
+                conf = st.session_state.infer_confidences["firmness"]
+                display_cols[current_col].plotly_chart(
+                    px.bar(x=FIRMNESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
+                           title="Overall Firmness Confidence", color=FIRMNESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
+                    use_container_width=True
+                )
+            current_col += 1
+        
+        if "ripeness" in infer_results:
+            display_cols[current_col].metric("Ripeness Prediction", infer_results["ripeness"])
+            if "ripeness" in st.session_state.infer_confidences:
+                conf = st.session_state.infer_confidences["ripeness"]
+                display_cols[current_col].plotly_chart(
+                    px.bar(x=RIPENESS_LABELS, y=conf, labels={"x":"Label","y":"Confidence"},
+                           title="Overall Ripeness Confidence", color=RIPENESS_LABELS, color_discrete_sequence=px.colors.qualitative.Pastel),
+                    use_container_width=True
+                )
+            current_col += 1
+
+        if current_col < len(display_cols): # Check if space for time
+             display_cols[current_col].info(f"Time to generate prediction: {st.session_state.pred_time}")
+        else: # if no space, print it below
+             st.info(f"Time to generate prediction: {st.session_state.pred_time}")
+
 
         st.markdown("---")
         st.subheader("5. Provide Real Label (Optional)")
@@ -210,4 +479,9 @@ def show_inference_page():
                 real_ripe = st.selectbox("True Ripeness (if known)", RIPENESS_LABELS, index=1, key="real_ripe")
             retrain = st.form_submit_button("Retrain Model with This Label (simulated)")
             if retrain:
-                st.success("Thank you! The model will be retrained with your label (simulated).") 
+                st.success("Thank you! The model will be retrained with your label (simulated).")
+        
+        # Display Raw API Response at the end
+        if "raw_api_result" in st.session_state:
+            with st.expander("Raw API Response", expanded=False):
+                st.json(st.session_state.raw_api_result)
