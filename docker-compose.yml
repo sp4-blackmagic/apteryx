@@ -1,0 +1,67 @@
+services:
+
+  web_application:
+    build: .
+    container_name: apteryx_application
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GEMINI_API_KEY=key
+
+    restart: unless-stopped
+
+  storage_microservice:
+    image: ghcr.io/sp4-blackmagic/storage_microservice:latest
+    container_name: storage_microservice 
+
+    ports:
+      - "8000:8000" # Maps port 8000 on the host to port 8000 in the container
+
+    volumes:
+      # Mounts the named volume 'temp_data' to '/app/temp' inside the container
+      - temp_data:/app/temp
+      # Mounts the named volume 'bucket_data' to '/app/bucket' inside the container
+      - bucket_data:/app/bucket
+
+    environment:
+      # Add any environment variables your FastAPI application needs
+      - PYTHONUNBUFFERED=1 # Often useful for seeing logs immediately
+
+    restart: unless-stopped # Optional: configures the restart policy for the container
+
+  preprocessor_microservice:
+    image: ghcr.io/sp4-blackmagic/preprocessor-microservice:latest
+    container_name: preprocessor_microservice
+    ports:
+      - "8001:8001"
+
+    environment:
+      - PYTHONUNBUFFERED=1
+
+    restart: unless-stopped
+
+  inference_microservice:
+    image: ghcr.io/sp4-blackmagic/inference_microservice:latest
+    container_name: inference_microservice
+    ports:
+      - "6969:6969"
+
+    environment:
+      - PYTHONUNBUFFERED=1
+
+    restart: unless-stopped
+
+# Top-level 'volumes' section to declare and manage the named volumes
+volumes:
+  temp_data:
+    # Declares a named volume called 'temp_data'. Docker will create it if it doesn't exist.
+    driver: local # 'local' is the default driver, storing data on the host Docker manages.
+    name: storage_volume
+
+  bucket_data:
+    # Declares a named volume called 'bucket_data'.
+    driver: local
+    name: storage_bucket
