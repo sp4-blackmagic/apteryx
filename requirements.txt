@@ -1,0 +1,13 @@
+streamlit
+numpy
+pandas
+plotly
+spectral
+Pillow
+opencv-python 
+matplotlib
+scikit-image
+pyyaml
+scipy
+python-dotenv
+google-generativeai

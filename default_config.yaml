@@ -1,0 +1,14 @@
+camera:
+  integration_time: 100
+  cam_width: 640
+  cam_height: 480
+visualization:
+  smoothing_window: 7
+  smoothing_polyorder: 2
+datacube:
+  max_dim: 64
+  auto_contrast: true
+  show_rgb: false
+  show_pseudo: false
+  hist_eq: false
+  export_csv: false 
