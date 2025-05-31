@@ -10,7 +10,7 @@ import json
 
 # TODO: update / make this more dynamic
 INFERENCE_API_BASE_URL = "http://192.168.2.2:6969"  # Updated base API URL
-STORAGE_API_URL = "http://192.168.2.11:8000/download_item/" # Storage API URL
+STORAGE_API_URL = "http://192.168.2.11:8000/download_csv/" # Storage API URL
 
 
 
@@ -208,7 +208,7 @@ def show_inference_page():
             
             #TODO: when storage API is ready, use the file_uid from session state
             # file_uid = st.session_state.get("current_file_uid", "sample_data") # Ensure this is set appropriately
-            file_uid = "20250531134318327-d5b5f0252d"
+            file_uid = "20250531171421960-e519a82232"
 
             api_base_url = st.session_state.get("inference_api_url", INFERENCE_API_BASE_URL)
             
