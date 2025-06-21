@@ -20,8 +20,8 @@ async def post_files_to_preprocessor(hdr_basename, hdr_data, raw_basename, raw_d
     storage_endpoint_val = st.session_state.get("storage_endpoint_val", STORAGE_ENDPOINT_VALUE_DEFAULT)
 
     files_payload = {
-        "hdr_file": (hdr_basename, io.BytesIO(hdr_data), "application/octet-stream"),
-        "cube_file": (raw_basename, io.BytesIO(raw_data), "application/octet-stream"),
+        "hdr_file": (hdr_basename, io.BytesIO(hdr_data)),
+        "cube_file": (raw_basename, io.BytesIO(raw_data)),
     }
     data_payload = {
         "remove_background": "false",
@@ -52,6 +52,9 @@ async def post_files_to_preprocessor(hdr_basename, hdr_data, raw_basename, raw_d
                 files=files_payload,
                 data=data_payload,
             )
+            print(f"Prepared request to preprocessor: {request.url}")
+            print(f"Request headers: {request.headers}")
+            print(f"Request content: {request.content}")
             st.info(f"Sending data to preprocessor at {preprocessor_url}...")
             response = await client.post(preprocessor_url, files=files_payload, data=data_payload, timeout=timeout_seconds)
             #response = await client.get(preprocessor_url)
@@ -248,7 +251,7 @@ def show_camera_page():
                                 st.success(f"Extracted HDR ('{hdr_filename}') and RAW ('{raw_filename}') files from archive.")
 
                                 # Run the async function to post files
-                               preprocessor_response = asyncio.run(
+                                preprocessor_response = asyncio.run(
                                     post_files_to_preprocessor(
                                         hdr_filename, hdr_file_content,
                                         raw_filename, raw_file_content
