@@ -12,12 +12,17 @@ import asyncio
 PREPROCESSOR_API_URL_DEFAULT = "http://0.0.0.0:8001/preprocessor/api/preprocess"
 STORAGE_ENDPOINT_VALUE_DEFAULT = "http://0.0.0.0:8000/upload"
 
+
 async def post_files_to_preprocessor(hdr_basename, hdr_data, raw_basename, raw_data):
     """
     Asynchronously posts HDR and RAW file data to the preprocessor service.
     """
-    preprocessor_url = st.session_state.get("preprocessor_url", PREPROCESSOR_API_URL_DEFAULT)
-    storage_endpoint_val = st.session_state.get("storage_endpoint_val", STORAGE_ENDPOINT_VALUE_DEFAULT)
+    preprocessor_url = st.session_state.get(
+        "preprocessor_url", PREPROCESSOR_API_URL_DEFAULT
+    )
+    storage_endpoint_val = st.session_state.get(
+        "storage_endpoint_val", STORAGE_ENDPOINT_VALUE_DEFAULT
+    )
 
     files_payload = {
         "hdr_file": (hdr_basename, io.BytesIO(hdr_data)),
@@ -35,14 +40,12 @@ async def post_files_to_preprocessor(hdr_basename, hdr_data, raw_basename, raw_d
         "multiple_samples": "false",
         "extraction_methods": "",
         "sg_window_deriv": "11",
-        "background_treshold": "0.1"
+        "background_treshold": "0.1",
     }
-
-    
 
     # Use a longer timeout for potentially large file uploads
     # Increased timeout to 60 seconds, adjust as needed
-    timeout_seconds = st.session_state.get("preprocessor_timeout", 6000.0) 
+    timeout_seconds = st.session_state.get("preprocessor_timeout", 6000.0)
 
     async with httpx.AsyncClient() as client:
         try:
@@ -56,18 +59,32 @@ async def post_files_to_preprocessor(hdr_basename, hdr_data, raw_basename, raw_d
             print(f"Request headers: {request.headers}")
             print(f"Request content: {request.content}")
             st.info(f"Sending data to preprocessor at {preprocessor_url}...")
-            response = await client.post(preprocessor_url, files=files_payload, data=data_payload, timeout=timeout_seconds)
-            #response = await client.get(preprocessor_url)
-            st.info(f"Response from preprocessor: {response.status_code} - {response.text}" )
+            response = await client.post(
+                preprocessor_url,
+                files=files_payload,
+                data=data_payload,
+                timeout=timeout_seconds,
+            )
+            if response.is_error:
+                await response.aread()
+                response.raise_for_status()
+            # response = await client.get(preprocessor_url)
+            st.info(
+                f"Response from preprocessor: {response.status_code} - {response.text}"
+            )
             return response
         except httpx.TimeoutException:
-            st.error(f"Request to preprocessor timed out after {timeout_seconds} seconds.")
+            st.error(
+                f"Request to preprocessor timed out after {timeout_seconds} seconds."
+            )
             return None
         except httpx.RequestError as exc:
             st.error(f"Request to preprocessor failed: {exc}")
             return None
         except Exception as e:
-            st.error(f"An unexpected error occurred while sending data to preprocessor: {e}")
+            st.error(
+                f"An unexpected error occurred while sending data to preprocessor: {e}"
+            )
             return None
 
 
@@ -219,13 +236,17 @@ def show_camera_page():
                 if response.status_code == 200:
                     img = Image.open(io.BytesIO(response.content))
                     st.image(img, caption="Latest Preview", use_container_width=True)
-        
+
         with col_full:
             if st.button("Get Full Capture & Send to Preprocessor"):
                 try:
-                    get_latest_response = requests.get(f"{st.session_state.full_url}/get_latest")
+                    get_latest_response = requests.get(
+                        f"{st.session_state.full_url}/get_latest"
+                    )
                     if get_latest_response.status_code == 200:
-                        st.success("Successfully retrieved capture data (tar.gz) from camera.")
+                        st.success(
+                            "Successfully retrieved capture data (tar.gz) from camera."
+                        )
                         tar_gz_content = get_latest_response.content
 
                         hdr_file_content = None
@@ -239,49 +260,95 @@ def show_camera_page():
                                     for member in tar.getmembers():
                                         if member.isfile():
                                             base_name = os.path.basename(member.name)
-                                            if base_name.lower().endswith((".hdr")) and hdr_file_content is None:
-                                                hdr_file_content = tar.extractfile(member).read()
+                                            if (
+                                                base_name.lower().endswith((".hdr"))
+                                                and hdr_file_content is None
+                                            ):
+                                                hdr_file_content = tar.extractfile(
+                                                    member
+                                                ).read()
                                                 hdr_filename = base_name
                                             # Common hyperspectral raw extensions: .raw, .img, .bil, .dat
-                                            elif base_name.lower().endswith((".raw", ".img", ".bil", ".dat")) and raw_file_content is None:
-                                                raw_file_content = tar.extractfile(member).read()
+                                            elif (
+                                                base_name.lower().endswith(
+                                                    (".raw", ".img", ".bil", ".dat")
+                                                )
+                                                and raw_file_content is None
+                                            ):
+                                                raw_file_content = tar.extractfile(
+                                                    member
+                                                ).read()
                                                 raw_filename = base_name
-                            
-                            if hdr_file_content and raw_file_content and hdr_filename and raw_filename:
-                                st.success(f"Extracted HDR ('{hdr_filename}') and RAW ('{raw_filename}') files from archive.")
+
+                            if (
+                                hdr_file_content
+                                and raw_file_content
+                                and hdr_filename
+                                and raw_filename
+                            ):
+                                st.success(
+                                    f"Extracted HDR ('{hdr_filename}') and RAW ('{raw_filename}') files from archive."
+                                )
 
                                 # Run the async function to post files
                                 preprocessor_response = asyncio.run(
                                     post_files_to_preprocessor(
-                                        hdr_filename, hdr_file_content,
-                                        raw_filename, raw_file_content
+                                        hdr_filename,
+                                        hdr_file_content,
+                                        raw_filename,
+                                        raw_file_content,
                                     )
                                 )
 
                                 if preprocessor_response:
-                                    if preprocessor_response.status_code == 200 or preprocessor_response.status_code == 201: # Common success codes
-                                        st.success(f"Data successfully sent to preprocessor: {preprocessor_response.status_code}")
+                                    if (
+                                        preprocessor_response.status_code == 200
+                                        or preprocessor_response.status_code == 201
+                                    ):  # Common success codes
+                                        st.success(
+                                            f"Data successfully sent to preprocessor: {preprocessor_response.status_code}"
+                                        )
                                         try:
-                                            st.json(preprocessor_response.json()) # Display JSON response if any
+                                            st.json(
+                                                preprocessor_response.json()
+                                            )  # Display JSON response if any
                                         except:
-                                            st.text(preprocessor_response.text) # Display text response if not JSON
+                                            st.text(
+                                                preprocessor_response.text
+                                            )  # Display text response if not JSON
                                     else:
-                                        st.error(f"Preprocessor returned an error: {preprocessor_response.status_code}")
-                                        st.text(preprocessor_response.text) # Show error response text
+                                        st.error(
+                                            f"Preprocessor returned an error: {preprocessor_response.status_code}"
+                                        )
+                                        st.text(
+                                            preprocessor_response.text
+                                        )  # Show error response text
                             else:
                                 missing_files = []
-                                if not hdr_file_content: missing_files.append("HDR")
-                                if not raw_file_content: missing_files.append("RAW")
-                                st.error(f"Could not find { ' and '.join(missing_files) } file(s) in the tar.gz archive. Ensure files have standard extensions (.hdr, .raw, .img, .bil, .dat).")
+                                if not hdr_file_content:
+                                    missing_files.append("HDR")
+                                if not raw_file_content:
+                                    missing_files.append("RAW")
+                                st.error(
+                                    f"Could not find {' and '.join(missing_files)} file(s) in the tar.gz archive. Ensure files have standard extensions (.hdr, .raw, .img, .bil, .dat)."
+                                )
 
                         except tarfile.TarError as te:
                             st.error(f"Error reading tar.gz archive: {te}")
                         except Exception as e_extract:
-                            st.error(f"An error occurred during file extraction or sending: {e_extract}")
+                            st.error(
+                                f"An error occurred during file extraction or sending: {e_extract}"
+                            )
 
                     else:
-                        st.error(f"Error getting tar.gz file from camera: {get_latest_response.status_code} - {get_latest_response.text}")
+                        st.error(
+                            f"Error getting tar.gz file from camera: {get_latest_response.status_code} - {get_latest_response.text}"
+                        )
                 except requests.exceptions.RequestException as e_req:
-                    st.error(f"Communication error with camera for Get Full Capture: {e_req}")
+                    st.error(
+                        f"Communication error with camera for Get Full Capture: {e_req}"
+                    )
                 except Exception as e_main:
-                    st.error(f"An unexpected error occurred in 'Get Full Capture': {e_main}")
+                    st.error(
+                        f"An unexpected error occurred in 'Get Full Capture': {e_main}"
+                    )
