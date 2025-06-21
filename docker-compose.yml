@@ -1,17 +1,17 @@
 services:
 
-  web_application:
-    build: .
-    container_name: apteryx_application
+  # web_application:
+  #   build: .
+  #   container_name: apteryx_application
 
-    ports:
-      - "8501:8501"
+  #   ports:
+  #     - "8501:8501"
 
-    environment:
-      - PYTHONUNBUFFERED=1
-      - GEMINI_API_KEY=key
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - GEMINI_API_KEY=key
 
-    restart: unless-stopped
+  #   restart: unless-stopped
 
   storage_microservice:
     image: ghcr.io/sp4-blackmagic/storage_microservice:latest
