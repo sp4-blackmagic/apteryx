@@ -3,6 +3,7 @@ import requests
 from PIL import Image
 import numpy as np
 import io
+import httpx
 
 
 def show_camera_page():
@@ -162,3 +163,13 @@ def show_camera_page():
                     st.success("tar.gz file received!")
                 else:
                     st.error("Error getting tar.gz file")
+
+
+# async with httpx.AsyncClient() as client:
+#     _files = {
+#         "hdr_file": (hdr_file.filename, hdr_file.file, "application/octet-stream"),
+#         "cube_file": (raw_file.filename, raw_file.file, "application/octet-stream"),
+#         "storage_endpoint": "endpoint / http://127.0.0.1:8000/upload"
+#     }
+
+#     response = await client.post("/preprocessor/api/preprocess", files=_files)
